@@ -4,7 +4,6 @@ import { StatusCode } from 'status-code-enum'
 
 export const validateBody = (schema: ZodType) => (req: Request, res: Response, next: NextFunction) => {
     try {
-        console.log("!body", JSON.stringify(req.body, null, 2));
         schema.parse(req.body);
         next();
     } catch (e) {
