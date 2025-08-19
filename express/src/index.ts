@@ -1,7 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import apiRoutes from './routes/api.js';
+import { configDotenv } from 'dotenv';
 
+configDotenv({path: ".env"});
 const app = express();
 const PORT = process.env.PORT || 3000;
 const SITE_URL = process.env.SITE_URL || 'http://localhost:3000';
@@ -14,28 +16,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cors({
   origin: SITE_URL,
   credentials: true,
-  optionsSuccessStatus: 200
 }));
 
 app.use('/api', apiRoutes);
-
-// Routes
-app.get('/', (req, res) => {
-  res.json({
-    message: 'express server running',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
-  });
-});
-
-// Error handler
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Error:', err.message);
-  res.status(500).json({
-    error: 'Internal server error',
-    message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
-  });
-});
 
 app.listen(PORT, () => {
   console.log(`- Server is running on port ${PORT}`);
