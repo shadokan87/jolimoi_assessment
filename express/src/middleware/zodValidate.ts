@@ -2,9 +2,9 @@ import type { Request, Response, NextFunction } from "express";
 import { ZodError, ZodType } from "zod";
 import { StatusCode } from 'status-code-enum'
 
-export const validateBody = (schema: ZodType) => (req: Request, res: Response, next: NextFunction) => {
+export const validateQueryParams = (schema: ZodType) => (req: Request, res: Response, next: NextFunction) => {
     try {
-        schema.parse(req.body);
+        schema.parse(req.query);
         next();
     } catch (e) {
         if (e instanceof ZodError) {

@@ -7,7 +7,7 @@ import { toTypedSchema } from '@vee-validate/zod';
 import { useMutation } from '@tanstack/vue-query'
 import { Loader } from 'lucide-vue-next';
 import services from './services';
-import { computed, reactive } from 'vue';
+import { computed, reactive, watch } from 'vue';
 const { VITE_APP_TITLE, VITE_APP_DESCRIPTION } = import.meta.env;
 
 const { handleSubmit, errors } = useForm({
@@ -15,22 +15,46 @@ const { handleSubmit, errors } = useForm({
 });
 
 const state = reactive({
-  submittedInput: undefined as string | undefined
-});
-
-const mutation = useMutation({
-  mutationFn: async (data: SubmitNumberSchema) => await services.convert.numberToRomanNumeral(data),
-  onError: (error) => {
-    let message = "Something went wrong";
-    if (error.message)
-      message += `: ${error.message}`;
-    alert(message);
-  }
+  submittedInput: undefined as string | undefined,
+  sseStatus: "idle" as "idle" | "waiting" | "success",
+  result: undefined as SubmitNumberSchema | undefined
 });
 
 const onSubmit = handleSubmit(values => {
-  state.submittedInput = values.userInput
-  mutation.mutate(values);
+  state.submittedInput = values.userInput;
+  const resetReq = () => {
+    state.submittedInput = undefined;
+    state.sseStatus = "idle";
+  }
+
+  (async () => {
+    try {
+      state.sseStatus = "waiting";
+      await services.convert.numberToRomanNumeral(values, {
+        success(data) {
+          state.result = data;
+          state.sseStatus = "success"
+        },
+        error() {
+          resetReq();
+          alert("Something went wrong");
+        },
+        timeout() {
+          resetReq();
+          alert("Request expired, please try again");
+        }
+      });
+    } catch (e) {
+      let message = "Something went wrong";
+      if (e && typeof e == "object" && "message" in e) {
+        const errorMessage = e["message"];
+        if (typeof errorMessage == "string")
+          message += `: ${errorMessage}`;
+      }
+      resetReq();
+      alert(message);
+    }
+  })();
 });
 
 const { value: userInput } = useField<SubmitNumberSchema["userInput"]>("userInput");
@@ -38,9 +62,9 @@ const { value: userInput } = useField<SubmitNumberSchema["userInput"]>("userInpu
 const disableConvert = computed(() => {
   if (errors.value.userInput)
     return true;
-  if (mutation.isPending.value)
+  if (state.sseStatus == "waiting")
     return true;
-  return (mutation.data.value?.data.result.userInput === userInput.value)
+  return (state.submittedInput === userInput.value)
 });
 
 </script>
@@ -51,13 +75,13 @@ const disableConvert = computed(() => {
       <h1 class="text-4xl">{{ VITE_APP_TITLE }}</h1>
       <p>{{ VITE_APP_DESCRIPTION }}</p>
     </div>
-    <span v-if="mutation.isSuccess.value">
-      {{ `${state.submittedInput} is ${mutation.data.value?.data.result.userInput}` }}
+    <span v-if="state.sseStatus == 'success'">
+      {{ `${state.submittedInput} is ${state.result?.userInput || '(converstion failed)'}` }}
     </span>
     <form @submit.prevent class="flex gap-2">
       <Input name="userInput" v-model="userInput" />
       <Button type="button" @click="onSubmit" :disabled="disableConvert">
-        <span v-if="mutation.isPending.value" class="flex gap-1 items-center justify-center">
+        <span v-if="state.sseStatus == 'waiting'" class="flex gap-1 items-center justify-center">
           {{ "converting" }}
           <Loader class="spinner" />
         </span>
